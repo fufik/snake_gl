@@ -21,19 +21,21 @@ GLuint fieldVBO, fieldVAO;
 void drawField(GLuint pShader,GLuint lShader);
 unsigned long getFileLength(std::ifstream& file);
 void drawSnake(Snake *pSnake);
+void drawGameOver();
 void moveSnake(Snake* pSnake);
 Snake* pPlayer;
+bool isOver = false;
 static void keycallback(GLFWwindow* window, int key, int scancode, int action, int mods){
 	if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
     glfwSetWindowShouldClose(window, GLFW_TRUE);
     Direction curDir = pPlayer->getDirection();
-    if(key == GLFW_KEY_W && curDir!=Down)
+    if(key == GLFW_KEY_W)
         pPlayer->setDirection(Up);
-    else if(key == GLFW_KEY_S && curDir!=Up)
+    else if(key == GLFW_KEY_S)
         pPlayer->setDirection(Down);
-    else if(key == GLFW_KEY_A && curDir!=Right)
+    else if(key == GLFW_KEY_A)
         pPlayer->setDirection(Left);
-    else if(key == GLFW_KEY_D && curDir!=Left)
+    else if(key == GLFW_KEY_D)
         pPlayer->setDirection(Right);
 }
 
@@ -100,9 +102,6 @@ int main(){
     vertices[verticesAmount][3] = vertices[verticesAmount-1][0];
     vertices[verticesAmount][4] = vertices[0][0];
     
-    //snaketest
-    //vertices[verticesAmount][5] = {0.0,0.0};
-    //vertices[verticesAmount][6] = {0.1,0.0};
     Snake* pSnake = new Snake(snakeMaxLength,shaderSnakeProgram);
     pPlayer = pSnake;
     pSnake->setLen(3);
@@ -112,14 +111,7 @@ int main(){
     pSnake->snake[1].is = true;
     pSnake->snake[2].coords = {0,2};
     pSnake->snake[2].is = true;
-    // int snakeSize = 2;
-/*  point lineCoords[verticesAmount*2][2];
-    for(int i = 0; i < verticesAmount;i++){
-        lineCoords[i][0] = vertices[i][0];
-        lineCoords[i][1] = vertices[i][verticesAmount-1];
-    }
-*/  
-    
+
     
     glGenBuffers(1, &fieldVBO);
     glGenVertexArrays(1, &fieldVAO);
@@ -137,10 +129,15 @@ int main(){
 
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
-        moveSnake(pSnake);
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
-        drawField(shaderProgram,shaderLProgram);
-        drawSnake(pSnake);
+        if(!isOver)
+            moveSnake(pSnake); // changes isOver, therefore I divided these calls
+        if(!isOver){
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+            drawField(shaderProgram,shaderLProgram);
+            drawSnake(pSnake);
+        }
+        if(isOver)
+            drawGameOver();
         glfwSwapBuffers(window);
     }
 
@@ -184,7 +181,6 @@ void drawSnake(Snake* pSnake){
                              (pSnake->snake[i].coords.y - (GLfloat)0.5 - coordSync)/10};  //RD
         toRender[i*5 + 4] = {(pSnake->snake[i].coords.x - (GLfloat)0.5 - coordSync)/10,
                              (pSnake->snake[i].coords.y - (GLfloat)0.5 - coordSync)/10};  //LD
-        
     }
     glBindBuffer(GL_ARRAY_BUFFER, pSnake->getVBO());
     glBufferData(GL_ARRAY_BUFFER, sizeof(point)*snakeLen*5, toRender, GL_STATIC_DRAW);
@@ -216,14 +212,27 @@ void moveSnake(Snake* pSnake){
         pSnake->snake[0].coords.x--;
     else if(pSnake->getDirection() == Right)
         pSnake->snake[0].coords.x++;
+    
+    if(pSnake->snake[0].coords.x>=fieldWidth||
+       pSnake->snake[0].coords.x<0||
+       pSnake->snake[0].coords.y>=fieldWidth||
+       pSnake->snake[0].coords.y<0)
+        isOver = true;
+    int w = 1;
+    while(pSnake->snake[w].is)
+    {
+        if (pSnake->snake[w].coords == pSnake->snake[0].coords){
+            isOver = true;
+            break;
+        } else {
+            w++;
+        }
+    }
+}
+
+void drawGameOver()
+{
+    
 }
 
 
-
-/*
-void makeVBO(GLuint &VBO,point &vert) {
-    glGenBuffers(1, &VBO);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vert), vert, GL_STATIC_DRAW);
-}
-*/
