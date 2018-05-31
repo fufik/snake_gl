@@ -1,3 +1,3 @@
-int loadshader(char filename[], GLchar** ShaderSource);
-int unloadshader(GLchar** ShaderSource);
+int loadShader(char filename[], GLchar** ShaderSource);
+int unloadShader(GLchar** ShaderSource);
 GLuint makeShaderProgram(GLchar *pfragshadersrc, GLchar *pvertshadersrc);

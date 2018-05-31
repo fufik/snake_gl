@@ -8,5 +8,12 @@ struct point{
         else
             return false;
     }
+    
+        bool operator!=(const point& rhs){
+        if(this->x != rhs.x && this->y != rhs.y)
+            return true;
+        else
+            return false;
+    }
 };
 

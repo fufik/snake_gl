@@ -1,17 +1,29 @@
+#pragma once
 #include <iostream>
 #include <fstream>
 #include <thread>
 #include <chrono>
+
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
+
+#include <ft2build.h>
+#include FT_FREETYPE_H
+
 #include "common.h"
 #include "shader.h"
 #include "snake.h"
+
 GLchar *vertexShaderSource,
        *fragmentShaderSource, 
        *fragmentLineShaderSource,
-       *fragmentSnakeShaderSource;
-const int verticesAmount = 10;
+       *fragmentSnakeShaderSource,
+       *fragmentFruitShaderSource;
+       
+FT_Library ft;
+
+
+const int verticesAmount = 20;
 const int fieldWidth = verticesAmount - 1;
 const float coordSync  = verticesAmount % 2 == 0?(fieldWidth/2):(fieldWidth/2 - 0.5);
 const int snakeMaxLength = (verticesAmount-1)*(verticesAmount-1);
@@ -23,29 +35,42 @@ unsigned long getFileLength(std::ifstream& file);
 void drawSnake(Snake *pSnake);
 void drawGameOver();
 void moveSnake(Snake* pSnake);
+void setFruit(Snake* pSnake);
+void drawFruit(GLuint shader);
+
 Snake* pPlayer;
+point fruit;
+bool isFruitEaten = true;
 bool isOver = false;
-static void keycallback(GLFWwindow* window, int key, int scancode, int action, int mods){
-	if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
-    glfwSetWindowShouldClose(window, GLFW_TRUE);
-    Direction curDir = pPlayer->getDirection();
-    if(key == GLFW_KEY_W)
-        pPlayer->setDirection(Up);
-    else if(key == GLFW_KEY_S)
-        pPlayer->setDirection(Down);
-    else if(key == GLFW_KEY_A)
-        pPlayer->setDirection(Left);
-    else if(key == GLFW_KEY_D)
-        pPlayer->setDirection(Right);
+
+Direction getDirByButton(int button){
+    if(button == GLFW_KEY_W)
+            return Up;
+        else if(button == GLFW_KEY_S)
+            return Down;
+        else if(button == GLFW_KEY_A)
+            return Left;
+        else if(button == GLFW_KEY_D)
+            return Right;
+        else return None;
 }
 
+static void keycallback(GLFWwindow* window, int key, int scancode, int action, int mods)
+{
+	if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
+        glfwSetWindowShouldClose(window, GLFW_TRUE);
+    Direction curDir = pPlayer->getDirection();
+    if(curDir + getDirByButton(key) != 0){
+        pPlayer->setDirection(getDirByButton(key));
+    }
+}
 int main(){
-    loadshader("f.vert",&vertexShaderSource);
-    loadshader("f.frag",&fragmentShaderSource);
-    loadshader("fl.frag",&fragmentLineShaderSource);
-    loadshader("snake.frag",&fragmentSnakeShaderSource);
-    if (glfwInit() == GLFW_FALSE)
-    {
+    loadShader("f.vert",&vertexShaderSource);
+    loadShader("f.frag",&fragmentShaderSource);
+    loadShader("fl.frag",&fragmentLineShaderSource);
+    loadShader("snake.frag",&fragmentSnakeShaderSource);
+    loadShader("fruit.frag",&fragmentFruitShaderSource);
+    if (glfwInit() == GLFW_FALSE){
         std::cout << "Failed to initialise the GLFW" << std::endl;
         return EXIT_FAILURE;
     }
@@ -57,8 +82,7 @@ int main(){
     glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
 
     GLFWwindow *window = glfwCreateWindow(768, 768, "Square", nullptr, nullptr);
-    if (window == nullptr)
-    {
+    if (window == nullptr){
         std::cout << "Failed to create a GLFW window" << std::endl;
         glfwTerminate();
         return EXIT_FAILURE;
@@ -66,8 +90,7 @@ int main(){
     glfwMakeContextCurrent(window);
 
     glewExperimental = GL_TRUE;
-    if (glewInit() != GLEW_OK)
-    {
+    if (glewInit() != GLEW_OK){
         std::cout << "Failed to initialise the GLEW" << std::endl;
         return EXIT_FAILURE;
     }
@@ -79,15 +102,28 @@ int main(){
     GLuint shaderProgram = makeShaderProgram(fragmentShaderSource,vertexShaderSource);
     GLuint shaderLProgram = makeShaderProgram(fragmentLineShaderSource,vertexShaderSource);
     GLuint shaderSnakeProgram = makeShaderProgram(fragmentSnakeShaderSource,vertexShaderSource);
-    unloadshader(&vertexShaderSource);
-    unloadshader(&fragmentShaderSource);
-    unloadshader(&fragmentLineShaderSource);
-    unloadshader(&fragmentSnakeShaderSource);
+    GLuint shaderFruitProgram = makeShaderProgram(fragmentFruitShaderSource,vertexShaderSource);
+    unloadShader(&vertexShaderSource);
+    unloadShader(&fragmentShaderSource);
+    unloadShader(&fragmentLineShaderSource);
+    unloadShader(&fragmentSnakeShaderSource);
+    unloadShader(&fragmentFruitShaderSource);
+
+    if(FT_Init_FreeType(&ft)) {
+        fprintf(stderr, "Could not init freetype library\n");
+        return EXIT_FAILURE;
+    }
+    FT_Face face;
+    if(FT_New_Face(ft, "LiberationSerif-Bold.ttf", 0, &face)) {
+        fprintf(stderr, "Could not open font\n");
+        return EXIT_FAILURE;
+    }
+    FT_Set_Pixel_Sizes(face, 0, 48);
+    
     point vertices[verticesAmount + 1][verticesAmount];
     for(int i = 0; i < verticesAmount; i++) {
         for(int j = 0; j < verticesAmount; j++) {
-            if(verticesAmount%2 == 0)
-            {
+            if(verticesAmount%2 == 0){
                 vertices[i][j].x = (j - (verticesAmount-1)/2.0)/10.0;
                 vertices[i][j].y = (i - (verticesAmount-1)/2.0)/10.0;
             } else {
@@ -105,11 +141,11 @@ int main(){
     Snake* pSnake = new Snake(snakeMaxLength,shaderSnakeProgram);
     pPlayer = pSnake;
     pSnake->setLen(3);
-    pSnake->snake[0].coords = {0,0};
+    pSnake->snake[0].coords = {coordSync,coordSync};
     pSnake->snake[0].is = true;
-    pSnake->snake[1].coords = {0,1};
+    pSnake->snake[1].coords = {coordSync,coordSync - 1};
     pSnake->snake[1].is = true;
-    pSnake->snake[2].coords = {0,2};
+    pSnake->snake[2].coords = {coordSync,coordSync - 2};
     pSnake->snake[2].is = true;
 
     
@@ -123,18 +159,19 @@ int main(){
 
     glfwSetKeyCallback(window,keycallback);
     glPointSize(5.0);
-	while (!glfwWindowShouldClose(window))
-    {
+	while (!glfwWindowShouldClose(window)){
         glfwPollEvents();
 
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
         if(!isOver)
+            setFruit(pSnake);
             moveSnake(pSnake); // changes isOver, therefore I divided these calls
         if(!isOver){
             std::this_thread::sleep_for(std::chrono::milliseconds(500));
             drawField(shaderProgram,shaderLProgram);
             drawSnake(pSnake);
+            drawFruit(shaderFruitProgram);
         }
         if(isOver)
             drawGameOver();
@@ -163,11 +200,50 @@ void drawField(GLuint pointShader,GLuint borderShader){
         
 }
 
+void setFruit(Snake* pSnake){
+    if(isFruitEaten){
+        // srand(time(NULL));
+        fruit.x = rand()%fieldWidth;
+        fruit.y = rand()%fieldWidth;
+        std::cout << "fruit: "<< fruit.x << " " << fruit.y << std::endl;
+      /*  bool collides = true;
+        while(collides)
+        {
+            srand(time(NULL));
+            fruit.x = rand()%fieldWidth;
+            fruit.y = rand()%fieldWidth;
+            int l = pSnake->getLen();
+            for(int i = 0; i < l; i++)
+            {
+                if (fruit != pSnake->snake[i].coords)
+                {
+                    collides = false;
+                }else{
+                    collides = true;
+                    break;
+                }
+            }
+        }*/
+        isFruitEaten = false;
+    }
+}
+
+void drawFruit(GLuint shader){
+    
+    point toRender = {(fruit.x - (GLfloat)0.5)/10,(fruit.y - (GLfloat)0.5)/10};
+    glEnableClientState(GL_VERTEX_ARRAY);
+    glVertexPointer(2,GL_FLOAT,0,&toRender);
+    glEnableVertexAttribArray(0);
+    glUseProgram(shader);
+    glDrawArrays(GL_POINTS,0,1);
+    glDisableClientState( GL_VERTEX_ARRAY );
+    //glVertex2f((fruit.x - (GLfloat)0.5 - coordSync)/10,(fruit.y - (GLfloat)0.5 - coordSync)/10);
+}
+
 void drawSnake(Snake* pSnake){
     int snakeLen = pSnake->getLen();
     point toRender[snakeLen*5];
-    for (int i = 0;i < snakeLen;i++) //turning every dot into a square
-    {
+    for (int i = 0;i < snakeLen; i++){ //turning every dot into a square
         if (pSnake->snake[i].is == false)
             break;
         //toRender[i*snakeLen + 0] = {snake[i].coords.x,snake[i].coords.y};
@@ -190,8 +266,7 @@ void drawSnake(Snake* pSnake){
     glEnableVertexAttribArray(0);
     glUseProgram(pSnake->getShader());
     
-    for (int i = 0;i < snakeLen;i++)
-    {
+    for (int i = 0; i < snakeLen; i++){
         glDrawArrays(GL_TRIANGLES,i*5,3);
         glDrawArrays(GL_TRIANGLES,i*5 + 2,3);
     }
@@ -201,7 +276,7 @@ void moveSnake(Snake* pSnake){
     if(pSnake->getDirection() == None)
         return;
     int len = pSnake->getLen();
-    for(int i = len - 1;i > 0;i--)
+    for(int i = len - 1; i > 0; i--)
         pSnake->snake[i] = pSnake->snake[i-1];
          
     if(pSnake->getDirection() == Up)
@@ -213,14 +288,18 @@ void moveSnake(Snake* pSnake){
     else if(pSnake->getDirection() == Right)
         pSnake->snake[0].coords.x++;
     
+            
+    if(pSnake->snake[0].coords == fruit)
+        isFruitEaten = true;
+    
     if(pSnake->snake[0].coords.x>=fieldWidth||
        pSnake->snake[0].coords.x<0||
        pSnake->snake[0].coords.y>=fieldWidth||
        pSnake->snake[0].coords.y<0)
         isOver = true;
+
     int w = 1;
-    while(pSnake->snake[w].is)
-    {
+    while(pSnake->snake[w].is){
         if (pSnake->snake[w].coords == pSnake->snake[0].coords){
             isOver = true;
             break;
@@ -230,8 +309,7 @@ void moveSnake(Snake* pSnake){
     }
 }
 
-void drawGameOver()
-{
+void drawGameOver(){
     
 }
 

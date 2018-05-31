@@ -5,11 +5,10 @@
 #include "common.h"
 #include "snake.h"
 
-Snake::Snake(unsigned int size,GLuint shader){
-    this->dir = None;
-    this->size = size;
-    this->snake = new snakeUnit[size];
-    this->shader = shader;
+Snake::Snake(unsigned int size,GLuint shader):size(size),shader(shader){
+    dir = None;
+    snake = new snakeUnit[size];
+    
 
     glGenBuffers(1, &VBO);
     glGenVertexArrays(1, &VAO);

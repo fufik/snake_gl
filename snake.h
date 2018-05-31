@@ -5,11 +5,11 @@ struct snakeUnit{
 };
 
 enum Direction{
-  None,
-  Up,
-  Right,
-  Down,
-  Left
+  None = 0,
+  Up = 1,
+  Right = 2,
+  Down = -1,
+  Left = -2
 };
 
 class Snake {

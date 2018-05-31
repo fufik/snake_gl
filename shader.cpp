@@ -6,14 +6,14 @@
 unsigned long getFileLength(std::ifstream& file)
 {
     if(!file.good()) return 0;
-    unsigned long pos=file.tellg();
+    unsigned long pos = file.tellg();
     file.seekg(0,std::ios::end);
     unsigned long len = file.tellg();
     file.seekg(std::ios::beg);
     return len;
 }
 
-int loadshader(char filename[], GLchar** ShaderSource)
+int loadShader(char filename[], GLchar** ShaderSource)
 {
     unsigned long len;
     std::ifstream file;
@@ -22,7 +22,7 @@ int loadshader(char filename[], GLchar** ShaderSource)
 
     len = getFileLength(file);
     
-    if (len==0) return -2;   // Error: Empty File 
+    if (len == 0) return -2;   // Error: Empty File 
     
     *ShaderSource = (GLchar*) new char[(len)+1];
     if (*ShaderSource == 0) return -3;   // can't reserve memory
@@ -43,7 +43,7 @@ int loadshader(char filename[], GLchar** ShaderSource)
     return 0; // No Error
 }
 
-int unloadshader(GLchar** ShaderSource)
+int unloadShader(GLchar** ShaderSource)
 {
     if (*ShaderSource != 0)
         delete[] *ShaderSource;
