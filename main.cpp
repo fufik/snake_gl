@@ -292,9 +292,12 @@ void moveSnake(Snake* pSnake,Fruit* pFruit){
         pSnake->snake[0].coords.x++;
     
             
-    if(pSnake->snake[0].coords == pFruit->coords)
+    if(pSnake->snake[0].coords == pFruit->coords){
         pFruit->isEaten = true;
-    
+        pSnake->setLen(pSnake->getLen() + 1);
+        pSnake->snake[pSnake->getLen() - 1].is = true;
+        pSnake->snake[pSnake->getLen() - 1].coords = pSnake->snake[pSnake->getLen() - 2].coords;
+    }
     if(pSnake->snake[0].coords.x>=fieldWidth||
        pSnake->snake[0].coords.x<0||
        pSnake->snake[0].coords.y>=fieldWidth||
