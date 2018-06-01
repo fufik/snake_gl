@@ -13,6 +13,7 @@
 #include "common.h"
 #include "shader.h"
 #include "snake.h"
+#include "fruit.h"
 
 GLchar *vertexShaderSource,
        *fragmentShaderSource, 
@@ -34,13 +35,12 @@ void drawField(GLuint pShader,GLuint lShader);
 unsigned long getFileLength(std::ifstream& file);
 void drawSnake(Snake *pSnake);
 void drawGameOver();
-void moveSnake(Snake* pSnake);
-void setFruit(Snake* pSnake);
-void drawFruit(GLuint shader);
+void moveSnake(Snake* pSnake,Fruit* pFruit);
+void setFruit(Snake* pSnake,Fruit* pFruit);
+void drawFruit(Fruit* pFruit);
 
 Snake* pPlayer;
-point fruit;
-bool isFruitEaten = true;
+
 bool isOver = false;
 
 Direction getDirByButton(int button){
@@ -147,8 +147,9 @@ int main(){
     pSnake->snake[1].is = true;
     pSnake->snake[2].coords = {coordSync,coordSync - 2};
     pSnake->snake[2].is = true;
-
     
+    Fruit* pFruit = new Fruit(shaderFruitProgram);
+    pFruit->coords = {0,0};
     glGenBuffers(1, &fieldVBO);
     glGenVertexArrays(1, &fieldVAO);
     glBindBuffer(GL_ARRAY_BUFFER, fieldVBO);
@@ -165,13 +166,13 @@ int main(){
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
         if(!isOver)
-            setFruit(pSnake);
-            moveSnake(pSnake); // changes isOver, therefore I divided these calls
+            setFruit(pSnake,pFruit);
+            moveSnake(pSnake,pFruit); // changes isOver, therefore I divided these calls
         if(!isOver){
             std::this_thread::sleep_for(std::chrono::milliseconds(500));
             drawField(shaderProgram,shaderLProgram);
             drawSnake(pSnake);
-            drawFruit(shaderFruitProgram);
+            drawFruit(pFruit);
         }
         if(isOver)
             drawGameOver();
@@ -191,6 +192,7 @@ void drawField(GLuint pointShader,GLuint borderShader){
         glBindVertexArray(fieldVAO);
         glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE,0,0);
         glEnableVertexAttribArray(0);
+        glPointSize( 5 );
         glUseProgram(pointShader);
         for(int i = 0; i < verticesAmount; i++)
             glDrawArrays(GL_POINTS,verticesAmount*i,verticesAmount);
@@ -200,12 +202,13 @@ void drawField(GLuint pointShader,GLuint borderShader){
         
 }
 
-void setFruit(Snake* pSnake){
-    if(isFruitEaten){
-        // srand(time(NULL));
-        fruit.x = rand()%fieldWidth;
-        fruit.y = rand()%fieldWidth;
-        std::cout << "fruit: "<< fruit.x << " " << fruit.y << std::endl;
+void setFruit(Snake* pSnake,Fruit* pFruit){
+    if(pFruit->isEaten){
+        srand(time(NULL));
+        pFruit->coords.x = rand()%fieldWidth;
+        pFruit->coords.y = rand()%fieldWidth;
+        //pFruit->coords = {0,0};
+        std::cout << "fruit: "<< pFruit->coords.x << " " << pFruit->coords.y << std::endl;
       /*  bool collides = true;
         while(collides)
         {
@@ -224,20 +227,20 @@ void setFruit(Snake* pSnake){
                 }
             }
         }*/
-        isFruitEaten = false;
+        pFruit->isEaten = false;
     }
 }
 
-void drawFruit(GLuint shader){
-    
-    point toRender = {(fruit.x - (GLfloat)0.5)/10,(fruit.y - (GLfloat)0.5)/10};
-    glEnableClientState(GL_VERTEX_ARRAY);
-    glVertexPointer(2,GL_FLOAT,0,&toRender);
+void drawFruit(Fruit* pFruit){
+    point toRender = {(pFruit->coords.x - coordSync)/10,(pFruit->coords.y - coordSync)/10};
+    glBindBuffer(GL_ARRAY_BUFFER, pFruit->getVBO());
+    glBufferData(GL_ARRAY_BUFFER, sizeof(point), &toRender, GL_STATIC_DRAW);
+    glBindVertexArray(pFruit->getVAO());
+    glPointSize( 10 );
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE,0,0);
     glEnableVertexAttribArray(0);
-    glUseProgram(shader);
+    glUseProgram(pFruit->getShader());
     glDrawArrays(GL_POINTS,0,1);
-    glDisableClientState( GL_VERTEX_ARRAY );
-    //glVertex2f((fruit.x - (GLfloat)0.5 - coordSync)/10,(fruit.y - (GLfloat)0.5 - coordSync)/10);
 }
 
 void drawSnake(Snake* pSnake){
@@ -272,7 +275,7 @@ void drawSnake(Snake* pSnake){
     }
 }
 
-void moveSnake(Snake* pSnake){
+void moveSnake(Snake* pSnake,Fruit* pFruit){
     if(pSnake->getDirection() == None)
         return;
     int len = pSnake->getLen();
@@ -289,8 +292,8 @@ void moveSnake(Snake* pSnake){
         pSnake->snake[0].coords.x++;
     
             
-    if(pSnake->snake[0].coords == fruit)
-        isFruitEaten = true;
+    if(pSnake->snake[0].coords == pFruit->coords)
+        pFruit->isEaten = true;
     
     if(pSnake->snake[0].coords.x>=fieldWidth||
        pSnake->snake[0].coords.x<0||

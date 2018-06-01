@@ -5,38 +5,38 @@ struct snakeUnit{
 };
 
 enum Direction{
-  None = 0,
-  Up = 1,
-  Right = 2,
-  Down = -1,
-  Left = -2
+  None =    0,
+  Up =      1,
+  Right =   2,
+  Down =    -1,
+  Left =    -2
 };
 
 class Snake {
 private:
-    Direction dir;
-    unsigned int len = 2;
-    unsigned int size = 0;
-    GLuint VBO = 0;
-    GLuint VAO = 0;
-    GLuint shader = 0;
+    Direction       dir;
+    unsigned int    len = 2;
+    unsigned int    size = 0;
+    GLuint          VBO = 0;
+    GLuint          VAO = 0;
+    GLuint          shader = 0;
 public:
     Snake(unsigned int size, GLuint shader = 0);
     ~Snake();
 
-    snakeUnit* snake;
+    snakeUnit*      snake;
     
-    void setDirection(Direction a);
-    void setLen(unsigned int len);
+    void            setDirection(Direction a);
+    void            setLen(unsigned int len);
     //void setVBO(GLuint vbo);
     //void setVAO(GLuint vao);
     //void setShader(GLuint shader);
     
-    Direction getDirection();
-    unsigned int getLen();
-    GLuint getVBO();
-    GLuint getVAO();
-    GLuint getShader();
+    Direction       getDirection();
+    unsigned int    getLen();
+    GLuint          getVBO();
+    GLuint          getVAO();
+    GLuint          getShader();
     
     
 };
