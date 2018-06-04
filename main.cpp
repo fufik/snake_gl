@@ -162,8 +162,8 @@ int main(int argc, char **argv){
     alSourcei(source, AL_LOOPING, AL_FALSE);
     if (error != AL_NO_ERROR)
         std::cout << alutGetErrorString(error) << std::endl;
-    ALuint buffer[7];
-    alGenBuffers((ALuint)7, buffer);
+    ALuint buffer[8];
+    alGenBuffers((ALuint)8, buffer);
     if (error != AL_NO_ERROR)
         std::cout << alutGetErrorString(error) << std::endl;
     
@@ -173,8 +173,8 @@ int main(int argc, char **argv){
     buffer[3] = alutCreateBufferFromFile("snake_reactions/snake_mmdelicious.wav");
     buffer[4] = alutCreateBufferFromFile("snake_reactions/snake_nottoobad.wav");
     buffer[5] = alutCreateBufferFromFile("snake_reactions/snake_prettytasty.wav");
-    buffer[6] = alutCreateBufferFromFile("snake_reactions/snake_whatcaisay.wav");
-    
+    buffer[6] = alutCreateBufferFromFile("snake_reactions/snake_whatcanisay.wav");
+    buffer[7] = alutCreateBufferFromFile("snake_reactions/game_over.wav");
     point vertices[verticesAmount + 1][verticesAmount];
     for(int i = 0; i < verticesAmount; i++) {
         for(int j = 0; j < verticesAmount; j++) {
@@ -236,8 +236,15 @@ int main(int argc, char **argv){
             drawSnake(pSnake);
             
         }
-        if(isOver)
-           drawGameOver(shaderTextProgram,face);
+        if(isOver){
+            alSourcei(source, AL_BUFFER, buffer[7]);
+            alSourcePlay(source);
+            while (!glfwWindowShouldClose(window)){    
+                glfwPollEvents();
+                drawGameOver(shaderTextProgram,face);
+                glfwSwapBuffers(window);
+            }
+        }
         glfwSwapBuffers(window);
     }
 
@@ -442,7 +449,6 @@ void drawGameOver(GLuint shader, FT_Face f){
         x += (f->glyph->advance.x/64)*sx;
         y += (f->glyph->advance.y/64)*sy;
     }
-    
     glDisable(GL_BLEND);
 }
 
