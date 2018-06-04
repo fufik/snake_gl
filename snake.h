@@ -5,7 +5,7 @@ struct snakeUnit{
 };
 
 enum Direction{
-  None =    0,
+  None =    9,
   Up =      1,
   Right =   2,
   Down =    -1,

@@ -14,6 +14,8 @@ Snake::Snake(unsigned int size,GLuint shader):size(size),shader(shader){
     glGenVertexArrays(1, &VAO);
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
     glBindVertexArray(VAO);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE,0,0);
+    glEnableVertexAttribArray(0);
 }
 Snake::~Snake(){
     delete[] this->snake;

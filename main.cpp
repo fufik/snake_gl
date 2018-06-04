@@ -16,14 +16,16 @@
 #include "fruit.h"
 
 GLchar *vertexShaderSource,
+       *vertexTextShaderSource,
        *fragmentShaderSource, 
        *fragmentLineShaderSource,
        *fragmentSnakeShaderSource,
-       *fragmentFruitShaderSource;
+       *fragmentFruitShaderSource,
+       *fragmentTextShaderSource;
        
 FT_Library ft;
 
-
+const int windowWidth = 768;
 const int verticesAmount = 20;
 const int fieldWidth = verticesAmount - 1;
 const float coordSync  = verticesAmount % 2 == 0?(fieldWidth/2):(fieldWidth/2 - 0.5);
@@ -34,7 +36,7 @@ GLuint fieldVBO, fieldVAO;
 void drawField(GLuint pShader,GLuint lShader);
 unsigned long getFileLength(std::ifstream& file);
 void drawSnake(Snake *pSnake);
-void drawGameOver();
+void drawGameOver(GLuint shader,FT_Face f);
 void moveSnake(Snake* pSnake,Fruit* pFruit);
 void setFruit(Snake* pSnake,Fruit* pFruit);
 void drawFruit(Fruit* pFruit);
@@ -66,10 +68,12 @@ static void keycallback(GLFWwindow* window, int key, int scancode, int action, i
 }
 int main(){
     loadShader("f.vert",&vertexShaderSource);
+    loadShader("text.vert",&vertexTextShaderSource);
     loadShader("f.frag",&fragmentShaderSource);
     loadShader("fl.frag",&fragmentLineShaderSource);
     loadShader("snake.frag",&fragmentSnakeShaderSource);
     loadShader("fruit.frag",&fragmentFruitShaderSource);
+    loadShader("text.frag",&fragmentTextShaderSource);
     if (glfwInit() == GLFW_FALSE){
         std::cout << "Failed to initialise the GLFW" << std::endl;
         return EXIT_FAILURE;
@@ -81,7 +85,7 @@ int main(){
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
     glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
 
-    GLFWwindow *window = glfwCreateWindow(768, 768, "Square", nullptr, nullptr);
+    GLFWwindow *window = glfwCreateWindow(windowWidth, windowWidth, "Snake", nullptr, nullptr);
     if (window == nullptr){
         std::cout << "Failed to create a GLFW window" << std::endl;
         glfwTerminate();
@@ -103,12 +107,14 @@ int main(){
     GLuint shaderLProgram = makeShaderProgram(fragmentLineShaderSource,vertexShaderSource);
     GLuint shaderSnakeProgram = makeShaderProgram(fragmentSnakeShaderSource,vertexShaderSource);
     GLuint shaderFruitProgram = makeShaderProgram(fragmentFruitShaderSource,vertexShaderSource);
+    GLuint shaderTextProgram = makeShaderProgram(fragmentTextShaderSource,vertexTextShaderSource);
     unloadShader(&vertexShaderSource);
+    unloadShader(&vertexTextShaderSource);
     unloadShader(&fragmentShaderSource);
     unloadShader(&fragmentLineShaderSource);
     unloadShader(&fragmentSnakeShaderSource);
     unloadShader(&fragmentFruitShaderSource);
-
+    unloadShader(&fragmentTextShaderSource);
     if(FT_Init_FreeType(&ft)) {
         fprintf(stderr, "Could not init freetype library\n");
         return EXIT_FAILURE;
@@ -118,7 +124,7 @@ int main(){
         fprintf(stderr, "Could not open font\n");
         return EXIT_FAILURE;
     }
-    FT_Set_Pixel_Sizes(face, 0, 48);
+    FT_Set_Pixel_Sizes(face, 0, 70);
     
     point vertices[verticesAmount + 1][verticesAmount];
     for(int i = 0; i < verticesAmount; i++) {
@@ -171,11 +177,12 @@ int main(){
         if(!isOver){
             std::this_thread::sleep_for(std::chrono::milliseconds(500));
             drawField(shaderProgram,shaderLProgram);
-            drawSnake(pSnake);
             drawFruit(pFruit);
+            drawSnake(pSnake);
+            
         }
         if(isOver)
-            drawGameOver();
+           drawGameOver(shaderTextProgram,face);
         glfwSwapBuffers(window);
     }
 
@@ -237,8 +244,8 @@ void drawFruit(Fruit* pFruit){
     glBufferData(GL_ARRAY_BUFFER, sizeof(point), &toRender, GL_STATIC_DRAW);
     glBindVertexArray(pFruit->getVAO());
     glPointSize( 10 );
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE,0,0);
-    glEnableVertexAttribArray(0);
+    //glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE,0,0);
+    //glEnableVertexAttribArray(0);
     glUseProgram(pFruit->getShader());
     glDrawArrays(GL_POINTS,0,1);
 }
@@ -264,9 +271,6 @@ void drawSnake(Snake* pSnake){
     glBindBuffer(GL_ARRAY_BUFFER, pSnake->getVBO());
     glBufferData(GL_ARRAY_BUFFER, sizeof(point)*snakeLen*5, toRender, GL_STATIC_DRAW);
     glBindVertexArray(pSnake->getVAO());
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE,0,0);
-
-    glEnableVertexAttribArray(0);
     glUseProgram(pSnake->getShader());
     
     for (int i = 0; i < snakeLen; i++){
@@ -298,9 +302,9 @@ void moveSnake(Snake* pSnake,Fruit* pFruit){
         pSnake->snake[pSnake->getLen() - 1].is = true;
         pSnake->snake[pSnake->getLen() - 1].coords = pSnake->snake[pSnake->getLen() - 2].coords;
     }
-    if(pSnake->snake[0].coords.x>=fieldWidth||
+    if(pSnake->snake[0].coords.x>fieldWidth - 1||
        pSnake->snake[0].coords.x<0||
-       pSnake->snake[0].coords.y>=fieldWidth||
+       pSnake->snake[0].coords.y>fieldWidth - 1||
        pSnake->snake[0].coords.y<0)
         isOver = true;
 
@@ -315,8 +319,76 @@ void moveSnake(Snake* pSnake,Fruit* pFruit){
     }
 }
 
-void drawGameOver(){
+void drawGameOver(GLuint shader, FT_Face f){
+    std::string str = "GAME  OVER";
+    float sx = 2.0/windowWidth;
+    float sy = 2.0/windowWidth;
+    //float sx = 0;
+    //float sy = 0;
+    float x = - 0.5;
+    float y = 0;
+    GLuint tex;
+    GLuint vbo;
+    GLuint uniform_color   = glGetUniformLocation(shader,"color"),
+           uniform_tex     = glGetUniformLocation(shader,"tex"),
+           attribute_coord = glGetAttribLocation(shader,"coord");
+    GLfloat white[4] = {1,1,1,1};
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC1_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+    glUseProgram(shader);
+    glActiveTexture(GL_TEXTURE0);
+    glGenTextures(1,&tex);
+    glBindTexture(GL_TEXTURE_2D,tex);
+    glUniform1i(uniform_tex,0);
+    glUniform4fv(uniform_color,1,white);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glPixelStorei(GL_UNPACK_ALIGNMENT,1);
+    
+    glGenBuffers(1,&vbo);
+    
+    glBindBuffer(GL_ARRAY_BUFFER,vbo);
+    glVertexAttribPointer(attribute_coord,4,GL_FLOAT,GL_FALSE,0,0);
+    glEnableVertexAttribArray(0);
+    
+    
+    for(char ch: str){
+        if (FT_Load_Char(f,ch,FT_LOAD_RENDER))
+            continue;
+        glTexImage2D(
+            GL_TEXTURE_2D,
+            0,
+            GL_RED,
+            f->glyph->bitmap.width,
+            f->glyph->bitmap.rows,
+            0,
+            GL_RED,
+            GL_UNSIGNED_BYTE,
+            f->glyph->bitmap.buffer
+        );
+        float x2 = x + f->glyph->bitmap_left * sx;
+        float y2 = -y - f->glyph->bitmap_top * sy;
+        float w = f->glyph->bitmap.rows * sx;
+        float h = f->glyph->bitmap.rows * sy;
+        
+        GLfloat box[4][4] = {
+            {x2,    -y2,     0, 0},
+            {x2 + w,-y2,     1, 0},
+            {x2,    -y2 - h, 0, 1},
+            {x2 + w,-y2 - h, 1, 1},
+            
+        };
+        
+        glBufferData(GL_ARRAY_BUFFER,sizeof box, box, GL_DYNAMIC_DRAW);
+        glDrawArrays(GL_TRIANGLE_STRIP,0,4);
+        x += (f->glyph->advance.x/64)*sx;
+        y += (f->glyph->advance.y/64)*sy;
+    }
+    
+    glDisable(GL_BLEND);
 }
 
 
