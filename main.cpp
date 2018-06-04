@@ -10,6 +10,9 @@
 #include <ft2build.h>
 #include FT_FREETYPE_H
 
+#include <AL/al.h>
+#include <AL/alc.h>
+#include <AL/alut.h>
 #include "common.h"
 #include "shader.h"
 #include "snake.h"
@@ -24,6 +27,7 @@ GLchar *vertexShaderSource,
        *fragmentTextShaderSource;
        
 FT_Library ft;
+
 
 const int windowWidth = 768;
 const int verticesAmount = 20;
@@ -66,7 +70,8 @@ static void keycallback(GLFWwindow* window, int key, int scancode, int action, i
         pPlayer->setDirection(getDirByButton(key));
     }
 }
-int main(){
+int main(int argc, char **argv){
+    alutInit (&argc, argv);
     loadShader("f.vert",&vertexShaderSource);
     loadShader("text.vert",&vertexTextShaderSource);
     loadShader("f.frag",&fragmentShaderSource);
@@ -126,6 +131,50 @@ int main(){
     }
     FT_Set_Pixel_Sizes(face, 0, 70);
     
+    //-----------------OPENAL
+    alGetError();
+    ALCenum error;
+    ALCdevice *aldev = alcOpenDevice(NULL);
+    if (aldev == NULL){
+        std::cout <<"Failed to init OpenAL device." << std::endl;;
+        return -1;
+    }
+    ALCcontext * alcon = alcCreateContext(aldev, NULL);
+    if (!alcMakeContextCurrent(alcon))
+        std::cout << alutGetErrorString(error) << std::endl;
+    ALuint source;
+    alGenSources((ALuint)1, &source);
+    error = alGetError();
+    if (error != AL_NO_ERROR)
+        std::cout << alutGetErrorString(error) << std::endl;
+    alSourcef(source, AL_PITCH, 1);
+    if (error != AL_NO_ERROR)
+        std::cout << alutGetErrorString(error) << std::endl;
+    alSourcef(source, AL_GAIN, 1);
+    if (error != AL_NO_ERROR)
+        std::cout << alutGetErrorString(error) << std::endl;
+    alSource3f(source, AL_POSITION, 0, 0, 0);
+    if (error != AL_NO_ERROR)
+        std::cout << alutGetErrorString(error) << std::endl;
+    alSource3f(source, AL_VELOCITY, 0, 0, 0);
+    if (error != AL_NO_ERROR)
+        std::cout << alutGetErrorString(error) << std::endl;
+    alSourcei(source, AL_LOOPING, AL_FALSE);
+    if (error != AL_NO_ERROR)
+        std::cout << alutGetErrorString(error) << std::endl;
+    ALuint buffer[7];
+    alGenBuffers((ALuint)7, buffer);
+    if (error != AL_NO_ERROR)
+        std::cout << alutGetErrorString(error) << std::endl;
+    
+    buffer[0] = alutCreateBufferFromFile("snake_reactions/snake_disgusting.wav");
+    buffer[1] = alutCreateBufferFromFile("snake_reactions/snake_hmm.wav");
+    buffer[2] = alutCreateBufferFromFile("snake_reactions/snake_iwantsomemore.wav");
+    buffer[3] = alutCreateBufferFromFile("snake_reactions/snake_mmdelicious.wav");
+    buffer[4] = alutCreateBufferFromFile("snake_reactions/snake_nottoobad.wav");
+    buffer[5] = alutCreateBufferFromFile("snake_reactions/snake_prettytasty.wav");
+    buffer[6] = alutCreateBufferFromFile("snake_reactions/snake_whatcaisay.wav");
+    
     point vertices[verticesAmount + 1][verticesAmount];
     for(int i = 0; i < verticesAmount; i++) {
         for(int j = 0; j < verticesAmount; j++) {
@@ -166,6 +215,7 @@ int main(){
 
     glfwSetKeyCallback(window,keycallback);
     glPointSize(5.0);
+    srand(time(NULL));
 	while (!glfwWindowShouldClose(window)){
         glfwPollEvents();
 
@@ -174,6 +224,11 @@ int main(){
         if(!isOver)
             setFruit(pSnake,pFruit);
             moveSnake(pSnake,pFruit); // changes isOver, therefore I divided these calls
+        if(pFruit->isEaten){
+            int i = rand()%7;
+            alSourcei(source, AL_BUFFER, buffer[i]);
+            alSourcePlay(source);
+        }
         if(!isOver){
             std::this_thread::sleep_for(std::chrono::milliseconds(500));
             drawField(shaderProgram,shaderLProgram);
